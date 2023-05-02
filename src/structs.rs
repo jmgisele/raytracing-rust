@@ -43,6 +43,13 @@ impl Add<Point> for Vector3<f64> {
     }
 }
 
+impl Add<Point> for Point {
+    type Output = Vector3<f64>;
+    fn add(self, point: Point) -> Self::Output {
+        self.0 + point.0
+    }
+}
+
 impl Sub<Point> for Vector3<f64> {
     type Output = Vector3<f64>;
     fn sub(self, point: Point) -> Self::Output {
@@ -54,6 +61,13 @@ impl Sub<Vector3<f64>> for Point {
     type Output = Vector3<f64>;
     fn sub(self, vec: Vector3<f64>) -> Self::Output {
         self.0 - vec
+    }
+}
+
+impl Sub<Point> for Point {
+    type Output = Vector3<f64>;
+    fn sub(self, vec: Point) -> Self::Output {
+        self.0 - vec.0
     }
 }
 

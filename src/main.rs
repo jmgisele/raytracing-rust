@@ -42,12 +42,30 @@ fn main() {
     eprintln!("Done!");
 }
 
+fn hit_sphere(center: Point, radius: f64, ray: &Ray) -> bool {
+    let vec_oc = ray.origin - center;
+
+    let a = ray.dir.magnitude_squared();
+    let b = 2. * vec_oc.dot(&ray.dir);
+    let c = vec_oc.magnitude_squared() - (radius * radius);
+    let discriminant = b * b - 4. * a * c;
+
+    discriminant > 0.
+}
+
 fn ray_color(ray: &Ray) -> Color {
+    let white = Color(Vector3::new(1., 1., 1.));
+    let red = Color(Vector3::new(1., 0., 0.));
+    let blue = Color(Vector3::new(0.5, 0.7, 1.));
+
+    if (hit_sphere(Point(Vector3::new(0., 0., -1.)), 0.5, ray)) {
+        return red;
+    }
     let unit_dir: Vector3<f64> = ray.dir.normalize();
 
     let t = 0.5 * unit_dir.y + 1.;
 
-    return (1. - t) * Color(Vector3::new(1., 1., 1.)) + t * Color(Vector3::new(0.5, 0.7, 1.));
+    (1. - t) * white + t * blue
 }
 
 fn write_color(color: Color) {
