@@ -1,6 +1,9 @@
-use nalgebra::Vector3;
-use structs::{Color, Point, Ray};
+use std::f64::INFINITY;
 
+use nalgebra::Vector3;
+use structs::{Color, Intersection, ObjectList, Point, Ray, Sphere};
+
+pub mod math;
 pub mod structs;
 
 fn main() {
@@ -8,6 +11,19 @@ fn main() {
     const IMAGE_WIDTH: u32 = 400;
     const ASPECT_RATIO: f64 = 16. / 9.;
     const IMAGE_HEIGHT: u32 = (IMAGE_WIDTH as f64 / ASPECT_RATIO) as u32;
+
+    // world
+    let mut world = ObjectList {
+        objects: Vec::new(),
+    };
+    world.objects.push(Sphere {
+        center: Point(Vector3::new(0., 0., -1.)),
+        radius: 0.5,
+    });
+    world.objects.push(Sphere {
+        center: Point(Vector3::new(0., -100.5, -1.)),
+        radius: 100.,
+    });
 
     // camera
     const VIEWPORT_HEIGHT: f64 = 2.;
@@ -34,7 +50,7 @@ fn main() {
                 dir: lower_left_corner + u * horizontal + v * vertical - origin,
             };
 
-            let color = ray_color(&ray);
+            let color = ray_color(&ray, &world);
 
             write_color(color);
         }
@@ -42,29 +58,32 @@ fn main() {
     eprintln!("Done!");
 }
 
-fn hit_sphere(center: Point, radius: f64, ray: &Ray) -> bool {
+fn hit_sphere(center: Point, radius: f64, ray: &Ray) -> f64 {
     let vec_oc = ray.origin - center;
 
     let a = ray.dir.magnitude_squared();
-    let b = 2. * vec_oc.dot(&ray.dir);
+    let b = vec_oc.dot(&ray.dir);
     let c = vec_oc.magnitude_squared() - (radius * radius);
-    let discriminant = b * b - 4. * a * c;
+    let discriminant = b * b - a * c;
 
-    discriminant > 0.
+    match discriminant < 0. {
+        true => -1.,
+        false => (-b - discriminant.sqrt()) / a,
+    }
 }
 
-fn ray_color(ray: &Ray) -> Color {
+fn ray_color(ray: &Ray, world: &ObjectList<Sphere>) -> Color {
     let white = Color(Vector3::new(1., 1., 1.));
-    let red = Color(Vector3::new(1., 0., 0.));
     let blue = Color(Vector3::new(0.5, 0.7, 1.));
 
-    if (hit_sphere(Point(Vector3::new(0., 0., -1.)), 0.5, ray)) {
-        return red;
+    let mut intersection = Intersection::default();
+
+    if world.get_hits(ray, 0., INFINITY, &mut intersection) {
+        return 0.5 * (Color(intersection.normal) + white);
     }
+
     let unit_dir: Vector3<f64> = ray.dir.normalize();
-
-    let t = 0.5 * unit_dir.y + 1.;
-
+    let t = 0.5 * (unit_dir.y + 1.);
     (1. - t) * white + t * blue
 }
 
