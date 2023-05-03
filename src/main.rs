@@ -3,14 +3,23 @@ use std::f64::INFINITY;
 use nalgebra::Vector3;
 use structs::{Color, Intersection, ObjectList, Point, Ray, Sphere};
 
+use crate::{
+    camera::{Camera, ASPECT_RATIO},
+    math::{clamp, rand},
+};
+
+pub mod camera;
 pub mod math;
 pub mod structs;
 
 fn main() {
     // image
     const IMAGE_WIDTH: u32 = 400;
-    const ASPECT_RATIO: f64 = 16. / 9.;
     const IMAGE_HEIGHT: u32 = (IMAGE_WIDTH as f64 / ASPECT_RATIO) as u32;
+    const SAMPLES_PER_PIXEL: i32 = 100;
+
+    // camera
+    let camera = Camera::default();
 
     // world
     let mut world = ObjectList {
@@ -20,21 +29,11 @@ fn main() {
         center: Point(Vector3::new(0., 0., -1.)),
         radius: 0.5,
     });
+
     world.objects.push(Sphere {
         center: Point(Vector3::new(0., -100.5, -1.)),
         radius: 100.,
     });
-
-    // camera
-    const VIEWPORT_HEIGHT: f64 = 2.;
-    const VIEWPORT_WIDTH: f64 = ASPECT_RATIO * VIEWPORT_HEIGHT;
-    const FOCAL_LENGTH: f64 = 1.;
-
-    let origin = Point(Vector3::new(0., 0., 0.));
-    let horizontal: Vector3<f64> = Vector3::new(VIEWPORT_WIDTH, 0., 0.);
-    let vertical: Vector3<f64> = Vector3::new(0., VIEWPORT_HEIGHT, 0.);
-    let lower_left_corner: Vector3<f64> =
-        origin.0 - (horizontal / 2.) - (vertical / 2.) - Vector3::new(0., 0., FOCAL_LENGTH);
 
     // render
     println!("P3\n{IMAGE_WIDTH} {IMAGE_HEIGHT}\n255\n");
@@ -42,34 +41,19 @@ fn main() {
     for j in (0..IMAGE_HEIGHT).rev() {
         eprintln!("Scanlines remaining: {j}");
         for i in 0..IMAGE_WIDTH {
-            let u = i as f64 / (IMAGE_WIDTH - 1) as f64;
-            let v = j as f64 / (IMAGE_HEIGHT - 1) as f64;
+            let mut color = Color(Vector3::new(0., 0., 0.));
+            for s in 0..SAMPLES_PER_PIXEL {
+                let u = (i as f64 + rand()) / (IMAGE_WIDTH - 1) as f64;
+                let v = (j as f64 + rand()) / (IMAGE_HEIGHT - 1) as f64;
 
-            let ray = Ray {
-                origin: origin,
-                dir: lower_left_corner + u * horizontal + v * vertical - origin,
-            };
+                let ray = camera.get_ray(u, v);
 
-            let color = ray_color(&ray, &world);
-
-            write_color(color);
+                color.0 += ray_color(&ray, &world).0;
+            }
+            write_color(color, SAMPLES_PER_PIXEL);
         }
     }
     eprintln!("Done!");
-}
-
-fn hit_sphere(center: Point, radius: f64, ray: &Ray) -> f64 {
-    let vec_oc = ray.origin - center;
-
-    let a = ray.dir.magnitude_squared();
-    let b = vec_oc.dot(&ray.dir);
-    let c = vec_oc.magnitude_squared() - (radius * radius);
-    let discriminant = b * b - a * c;
-
-    match discriminant < 0. {
-        true => -1.,
-        false => (-b - discriminant.sqrt()) / a,
-    }
 }
 
 fn ray_color(ray: &Ray, world: &ObjectList<Sphere>) -> Color {
@@ -87,10 +71,15 @@ fn ray_color(ray: &Ray, world: &ObjectList<Sphere>) -> Color {
     (1. - t) * white + t * blue
 }
 
-fn write_color(color: Color) {
-    let r = 255.999 * color.0.x;
-    let g = 255.999 * color.0.y;
-    let b = 255.999 * color.0.z;
+fn write_color(color: Color, samples_per_pix: i32) {
+    let mut r = color.0.x;
+    let mut g = color.0.y;
+    let mut b = color.0.z;
+
+    let scale = 1. / samples_per_pix as f64;
+    r = 256. * clamp(r * scale, 0., 0.999);
+    g = 256. * clamp(g * scale, 0., 0.999);
+    b = 256. * clamp(b * scale, 0., 0.999);
 
     println!("{r} {g} {b} \n");
 }
