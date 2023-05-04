@@ -1,5 +1,6 @@
 use std::f64::INFINITY;
 
+use math::random_unit_vec;
 use nalgebra::Vector3;
 use structs::{Color, Intersection, ObjectList, Point, Ray, Sphere};
 
@@ -17,11 +18,12 @@ fn main() {
     const IMAGE_WIDTH: u32 = 400;
     const IMAGE_HEIGHT: u32 = (IMAGE_WIDTH as f64 / ASPECT_RATIO) as u32;
     const SAMPLES_PER_PIXEL: i32 = 100;
-
+    const MAX_RAY_DEPTH: i32 = 50;
     // camera
     let camera = Camera::default();
 
     // world
+
     let mut world = ObjectList {
         objects: Vec::new(),
     };
@@ -42,13 +44,13 @@ fn main() {
         eprintln!("Scanlines remaining: {j}");
         for i in 0..IMAGE_WIDTH {
             let mut color = Color(Vector3::new(0., 0., 0.));
-            for s in 0..SAMPLES_PER_PIXEL {
+            for _ in 0..SAMPLES_PER_PIXEL {
                 let u = (i as f64 + rand()) / (IMAGE_WIDTH - 1) as f64;
                 let v = (j as f64 + rand()) / (IMAGE_HEIGHT - 1) as f64;
 
                 let ray = camera.get_ray(u, v);
 
-                color.0 += ray_color(&ray, &world).0;
+                color.0 += ray_color(&ray, &world, MAX_RAY_DEPTH).0;
             }
             write_color(color, SAMPLES_PER_PIXEL);
         }
@@ -56,14 +58,25 @@ fn main() {
     eprintln!("Done!");
 }
 
-fn ray_color(ray: &Ray, world: &ObjectList<Sphere>) -> Color {
+fn ray_color(ray: &Ray, world: &ObjectList<Sphere>, depth: i32) -> Color {
     let white = Color(Vector3::new(1., 1., 1.));
+    let black = Color(Vector3::new(0., 0., 0.));
     let blue = Color(Vector3::new(0.5, 0.7, 1.));
+
+    if depth <= 0 {
+        return black;
+    };
 
     let mut intersection = Intersection::default();
 
-    if world.get_hits(ray, 0., INFINITY, &mut intersection) {
-        return 0.5 * (Color(intersection.normal) + white);
+    if world.get_hits(ray, 0.001, INFINITY, &mut intersection) {
+        let target: Vector3<f64> = intersection.point + intersection.normal + random_unit_vec();
+        let refracted_ray: Ray = Ray {
+            origin: intersection.point,
+            dir: target - intersection.point,
+        };
+
+        return 0.5 * ray_color(&refracted_ray, world, depth - 1);
     }
 
     let unit_dir: Vector3<f64> = ray.dir.normalize();
@@ -77,9 +90,9 @@ fn write_color(color: Color, samples_per_pix: i32) {
     let mut b = color.0.z;
 
     let scale = 1. / samples_per_pix as f64;
-    r = 256. * clamp(r * scale, 0., 0.999);
-    g = 256. * clamp(g * scale, 0., 0.999);
-    b = 256. * clamp(b * scale, 0., 0.999);
+    r = 256. * clamp((r * scale).sqrt(), 0., 0.999);
+    g = 256. * clamp((g * scale).sqrt(), 0., 0.999);
+    b = 256. * clamp((b * scale).sqrt(), 0., 0.999);
 
     println!("{r} {g} {b} \n");
 }

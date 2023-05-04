@@ -5,10 +5,6 @@ use crate::structs::{Point, Ray};
 pub const ASPECT_RATIO: f64 = 16. / 9.;
 
 pub struct Camera {
-    aspect_ratio: f64,
-    viewport_height: f64,
-    viewport_width: f64,
-    focal_length: f64,
     origin: Point,
     lower_left: Point,
     horizontal: Vector3<f64>,
@@ -17,8 +13,6 @@ pub struct Camera {
 
 impl Default for Camera {
     fn default() -> Self {
-        let aspect_ratio: f64 = ASPECT_RATIO;
-
         const VIEWPORT_HEIGHT: f64 = 2.;
         const VIEWPORT_WIDTH: f64 = ASPECT_RATIO * VIEWPORT_HEIGHT;
         const FOCAL_LENGTH: f64 = 1.;
@@ -31,10 +25,6 @@ impl Default for Camera {
         );
 
         Camera {
-            aspect_ratio,
-            viewport_height: VIEWPORT_HEIGHT,
-            viewport_width: VIEWPORT_WIDTH,
-            focal_length: FOCAL_LENGTH,
             origin,
             lower_left,
             horizontal,
