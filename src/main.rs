@@ -4,14 +4,15 @@ use crate::{
     camera::{Camera, ASPECT_RATIO},
     math::{clamp, rand},
 };
-use material::{Lambertian, MaterialType, Metal};
+use data::Color;
 use nalgebra::Vector3;
-use structs::{Color, Hittable, Intersection, ObjectList, Point, Ray, Sphere};
+use world::{Hittable, ObjectList, Ray, Sphere};
 
 pub mod camera;
+pub mod data;
 pub mod material;
 pub mod math;
-pub mod structs;
+pub mod world;
 
 const WHITE: Color = Color(Vector3::new(1., 1., 1.));
 const BLACK: Color = Color(Vector3::new(0., 0., 0.));
@@ -43,7 +44,7 @@ fn main() {
 
                 let ray = camera.get_ray(u, v);
 
-                color.0 += ray_color(&ray, &world, MAX_RAY_DEPTH).0;
+                color = color + ray_color(&ray, &world, MAX_RAY_DEPTH);
             }
             write_color(color, SAMPLES_PER_PIXEL);
         }
@@ -56,14 +57,9 @@ fn ray_color(ray: &Ray, world: &ObjectList<Sphere>, depth: i32) -> Color {
         return BLACK;
     };
 
-    let mut intersection = Intersection::default();
-
-    if world.hit(ray, 0.001, INFINITY, &mut intersection) {
-        let mut refracted_ray: Ray = Ray::default();
-        let mut attenuation = Color::default();
+    if let Some(intersection) = world.hit(ray, 0.001, INFINITY) {
         let material = intersection.material;
-
-        if material.scatter(&ray, &intersection, &mut attenuation, &mut refracted_ray) {
+        if let Some((attenuation, refracted_ray)) = material.scatter(&ray, &intersection) {
             return Color(
                 attenuation
                     .0

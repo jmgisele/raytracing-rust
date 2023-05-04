@@ -1,6 +1,6 @@
 use nalgebra::Vector3;
 
-use crate::structs::{Point, Ray};
+use crate::{data::Point, world::Ray};
 
 pub const ASPECT_RATIO: f64 = 16. / 9.;
 
