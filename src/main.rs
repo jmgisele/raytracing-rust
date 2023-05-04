@@ -1,17 +1,21 @@
 use std::f64::INFINITY;
 
-use math::random_unit_vec;
-use nalgebra::Vector3;
-use structs::{Color, Intersection, ObjectList, Point, Ray, Sphere};
-
 use crate::{
     camera::{Camera, ASPECT_RATIO},
     math::{clamp, rand},
 };
+use material::{Lambertian, MaterialType, Metal};
+use nalgebra::Vector3;
+use structs::{Color, Hittable, Intersection, ObjectList, Point, Ray, Sphere};
 
 pub mod camera;
+pub mod material;
 pub mod math;
 pub mod structs;
+
+const WHITE: Color = Color(Vector3::new(1., 1., 1.));
+const BLACK: Color = Color(Vector3::new(0., 0., 0.));
+const BLUE: Color = Color(Vector3::new(0.5, 0.7, 1.));
 
 fn main() {
     // image
@@ -19,23 +23,12 @@ fn main() {
     const IMAGE_HEIGHT: u32 = (IMAGE_WIDTH as f64 / ASPECT_RATIO) as u32;
     const SAMPLES_PER_PIXEL: i32 = 100;
     const MAX_RAY_DEPTH: i32 = 50;
+
     // camera
     let camera = Camera::default();
 
     // world
-
-    let mut world = ObjectList {
-        objects: Vec::new(),
-    };
-    world.objects.push(Sphere {
-        center: Point(Vector3::new(0., 0., -1.)),
-        radius: 0.5,
-    });
-
-    world.objects.push(Sphere {
-        center: Point(Vector3::new(0., -100.5, -1.)),
-        radius: 100.,
-    });
+    let world = ObjectList::default();
 
     // render
     println!("P3\n{IMAGE_WIDTH} {IMAGE_HEIGHT}\n255\n");
@@ -59,29 +52,31 @@ fn main() {
 }
 
 fn ray_color(ray: &Ray, world: &ObjectList<Sphere>, depth: i32) -> Color {
-    let white = Color(Vector3::new(1., 1., 1.));
-    let black = Color(Vector3::new(0., 0., 0.));
-    let blue = Color(Vector3::new(0.5, 0.7, 1.));
-
     if depth <= 0 {
-        return black;
+        return BLACK;
     };
 
     let mut intersection = Intersection::default();
 
-    if world.get_hits(ray, 0.001, INFINITY, &mut intersection) {
-        let target: Vector3<f64> = intersection.point + intersection.normal + random_unit_vec();
-        let refracted_ray: Ray = Ray {
-            origin: intersection.point,
-            dir: target - intersection.point,
-        };
+    if world.hit(ray, 0.001, INFINITY, &mut intersection) {
+        let mut refracted_ray: Ray = Ray::default();
+        let mut attenuation = Color::default();
+        let material = intersection.material;
 
-        return 0.5 * ray_color(&refracted_ray, world, depth - 1);
+        if material.scatter(&ray, &intersection, &mut attenuation, &mut refracted_ray) {
+            return Color(
+                attenuation
+                    .0
+                    .zip_map(&ray_color(&refracted_ray, world, depth - 1).0, |l, r| l * r),
+            );
+        }
+
+        return BLACK;
     }
 
     let unit_dir: Vector3<f64> = ray.dir.normalize();
     let t = 0.5 * (unit_dir.y + 1.);
-    (1. - t) * white + t * blue
+    (1. - t) * WHITE + t * BLUE
 }
 
 fn write_color(color: Color, samples_per_pix: i32) {

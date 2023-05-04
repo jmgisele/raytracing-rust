@@ -1,7 +1,16 @@
 use nalgebra::Vector3;
 use std::ops::{Add, Mul, Sub};
 
+use crate::material::{Lambertian, MaterialType, Metal};
+
+#[derive(Copy, Clone)]
 pub struct Color(pub Vector3<f64>);
+
+impl Default for Color {
+    fn default() -> Self {
+        Color(Vector3::new(0., 0., 0.))
+    }
+}
 
 impl Mul<f64> for Color {
     type Output = Color;
@@ -76,6 +85,15 @@ pub struct Ray {
     pub dir: Vector3<f64>,
 }
 
+impl Default for Ray {
+    fn default() -> Self {
+        Ray {
+            origin: Point(Vector3::new(0., 0., 0.)),
+            dir: Vector3::new(0., 0., 0.),
+        }
+    }
+}
+
 impl Ray {
     pub fn at(&self, &t: &f64) -> Point {
         return Point(self.origin + t * self.dir);
@@ -83,7 +101,7 @@ impl Ray {
 }
 
 pub trait Hittable {
-    fn is_hit(&self, ray: &Ray, t_min: f64, t_max: f64, intersection: &mut Intersection) -> bool;
+    fn hit(&self, ray: &Ray, t_min: f64, t_max: f64, intersection: &mut Intersection) -> bool;
 
     fn root_in_bounds(root: &f64, t_min: f64, t_max: f64) -> bool {
         !(*root < t_min || *root > t_max)
@@ -96,6 +114,7 @@ pub struct Intersection {
     pub normal: Vector3<f64>,
     pub t: f64,
     pub front_face: bool,
+    pub material: MaterialType,
 }
 
 impl Intersection {
@@ -115,6 +134,9 @@ impl Default for Intersection {
             normal: Vector3::zeros(),
             t: 0.,
             front_face: false,
+            material: MaterialType::Lambertian(Lambertian {
+                albedo: Color::default(),
+            }),
         }
     }
 }
@@ -122,10 +144,11 @@ impl Default for Intersection {
 pub struct Sphere {
     pub center: Point,
     pub radius: f64,
+    pub material: MaterialType,
 }
 
 impl Hittable for Sphere {
-    fn is_hit(&self, ray: &Ray, t_min: f64, t_max: f64, intersection: &mut Intersection) -> bool {
+    fn hit(&self, ray: &Ray, t_min: f64, t_max: f64, intersection: &mut Intersection) -> bool {
         let vec_oc = ray.origin - self.center;
 
         let a = ray.dir.magnitude_squared();
@@ -147,6 +170,7 @@ impl Hittable for Sphere {
                 intersection.point = ray.at(&intersection.t);
                 let outward_normal = (intersection.point - self.center) / self.radius;
                 intersection.set_face_normal(ray, &outward_normal);
+                intersection.material = self.material;
 
                 return true;
             }
@@ -160,20 +184,59 @@ pub struct ObjectList<T> {
     pub objects: Vec<T>,
 }
 
-impl ObjectList<Sphere> {
-    pub fn get_hits(
-        &self,
-        ray: &Ray,
-        t_min: f64,
-        t_max: f64,
-        intersection: &mut Intersection,
-    ) -> bool {
+impl Default for ObjectList<Sphere> {
+    fn default() -> Self {
+        let mut world = ObjectList {
+            objects: Vec::new(),
+        };
+
+        world.objects.push(Sphere {
+            center: Point(Vector3::new(0., -100.5, -1.)),
+            radius: 100.,
+            material: MaterialType::Lambertian(Lambertian {
+                albedo: Color(Vector3::new(0.8, 0.8, 0.)),
+            }),
+        });
+
+        //center
+        world.objects.push(Sphere {
+            center: Point(Vector3::new(0., 0., -1.)),
+            radius: 0.5,
+            material: MaterialType::Lambertian(Lambertian {
+                albedo: Color(Vector3::new(0.7, 0.3, 0.3)),
+            }),
+        });
+
+        // left
+        world.objects.push(Sphere {
+            center: Point(Vector3::new(-1., 0., -1.)),
+            radius: 0.5,
+            material: MaterialType::Metal(Metal {
+                albedo: Color(Vector3::new(0.8, 0.8, 0.8)),
+            }),
+        });
+
+        // right
+        world.objects.push(Sphere {
+            center: Point(Vector3::new(1., 0., -1.)),
+            radius: 0.5,
+            material: MaterialType::Metal(Metal {
+                albedo: Color(Vector3::new(0.8, 0.6, 0.2)),
+            }),
+        });
+
+        world
+    }
+}
+
+impl Hittable for ObjectList<Sphere> {
+    fn hit(&self, ray: &Ray, t_min: f64, t_max: f64, intersection: &mut Intersection) -> bool {
         let mut temp_intersect = Intersection::default();
         let mut hit_anything = false;
         let mut closest = t_max;
 
         for object in self.objects.iter() {
-            if object.is_hit(ray, t_min, closest, &mut temp_intersect) {
+            if object.hit(ray, t_min, closest, &mut temp_intersect) {
                 hit_anything = true;
                 closest = temp_intersect.t;
                 *intersection = temp_intersect;
