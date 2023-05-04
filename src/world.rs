@@ -2,7 +2,7 @@ use nalgebra::Vector3;
 
 use crate::{
     data::{Color, Point},
-    material::{Lambertian, MaterialType, Metal},
+    material::{FuzzyMetal, Lambertian, MaterialType, Metal},
 };
 
 pub struct Ray {
@@ -102,6 +102,7 @@ impl Hittable for Sphere {
                 let outward_normal = (intersection.point - self.center) / self.radius;
                 intersection.set_front_face(ray, &outward_normal); // i happen first!
                 intersection.set_normal(&outward_normal); // depends on front face
+
                 intersection.material = self.material;
 
                 return Some(intersection);
@@ -114,6 +115,22 @@ impl Hittable for Sphere {
 
 pub struct ObjectList<T> {
     pub objects: Vec<T>,
+}
+
+impl Hittable for ObjectList<Sphere> {
+    fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<Intersection> {
+        let mut hit_anything = None;
+        let mut closest = t_max;
+
+        for object in self.objects.iter() {
+            if let Some(intersection) = object.hit(ray, t_min, closest) {
+                hit_anything = Some(intersection);
+                closest = intersection.t;
+            }
+        }
+
+        hit_anything
+    }
 }
 
 impl Default for ObjectList<Sphere> {
@@ -143,8 +160,9 @@ impl Default for ObjectList<Sphere> {
         world.objects.push(Sphere {
             center: Point(Vector3::new(-1., 0., -1.)),
             radius: 0.5,
-            material: MaterialType::Metal(Metal {
+            material: MaterialType::FuzzyMetal(FuzzyMetal {
                 albedo: Color(Vector3::new(0.8, 0.8, 0.8)),
+                fuzz: 0.3,
             }),
         });
 
@@ -158,21 +176,5 @@ impl Default for ObjectList<Sphere> {
         });
 
         world
-    }
-}
-
-impl Hittable for ObjectList<Sphere> {
-    fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<Intersection> {
-        let mut hit_anything = None;
-        let mut closest = t_max;
-
-        for object in self.objects.iter() {
-            if let Some(intersection) = object.hit(ray, t_min, closest) {
-                hit_anything = Some(intersection);
-                closest = intersection.t;
-            }
-        }
-
-        hit_anything
     }
 }

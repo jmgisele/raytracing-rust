@@ -2,7 +2,7 @@ use nalgebra::Vector3;
 
 use crate::{
     data::Color,
-    math::{near_zero, random_unit_vec, reflect},
+    math::{near_zero, random_unit_sphere, random_unit_vec, reflect},
     world::{Intersection, Ray},
 };
 
@@ -10,6 +10,7 @@ use crate::{
 pub enum MaterialType {
     Lambertian(Lambertian),
     Metal(Metal),
+    FuzzyMetal(FuzzyMetal),
 }
 
 impl MaterialType {
@@ -17,22 +18,18 @@ impl MaterialType {
         match *self {
             MaterialType::Lambertian(lam) => lam.scatter(ray_in, intersection),
             MaterialType::Metal(metal) => metal.scatter(ray_in, intersection),
+            MaterialType::FuzzyMetal(metal) => metal.scatter(ray_in, intersection),
         }
     }
+}
+
+pub trait Material {
+    fn scatter(&self, ray_in: &Ray, intersection: &Intersection) -> Option<(Color, Ray)>;
 }
 
 #[derive(Copy, Clone)]
 pub struct Lambertian {
     pub albedo: Color,
-}
-
-#[derive(Copy, Clone)]
-pub struct Metal {
-    pub albedo: Color,
-}
-
-pub trait Material {
-    fn scatter(&self, ray_in: &Ray, intersection: &Intersection) -> Option<(Color, Ray)>;
 }
 
 impl Material for Lambertian {
@@ -53,6 +50,11 @@ impl Material for Lambertian {
     }
 }
 
+#[derive(Copy, Clone)]
+pub struct Metal {
+    pub albedo: Color,
+}
+
 impl Material for Metal {
     fn scatter(&self, ray_in: &Ray, intersection: &Intersection) -> Option<(Color, Ray)> {
         let reflect_dir: Vector3<f64> = reflect(&ray_in.dir.normalize(), &intersection.normal);
@@ -61,6 +63,31 @@ impl Material for Metal {
         let ray_scattered = Ray {
             origin: intersection.point,
             dir: reflect_dir,
+        };
+
+        let dir = ray_scattered.dir.dot(&intersection.normal);
+
+        match dir > 0. {
+            true => Some((attenuation, ray_scattered)),
+            false => None,
+        }
+    }
+}
+
+#[derive(Copy, Clone)]
+pub struct FuzzyMetal {
+    pub albedo: Color,
+    pub fuzz: f64,
+}
+
+impl Material for FuzzyMetal {
+    fn scatter(&self, ray_in: &Ray, intersection: &Intersection) -> Option<(Color, Ray)> {
+        let reflect_dir: Vector3<f64> = reflect(&ray_in.dir.normalize(), &intersection.normal);
+
+        let attenuation = self.albedo;
+        let ray_scattered = Ray {
+            origin: intersection.point,
+            dir: reflect_dir + self.fuzz * random_unit_sphere(),
         };
 
         let dir = ray_scattered.dir.dot(&intersection.normal);

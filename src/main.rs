@@ -17,13 +17,13 @@ pub mod world;
 const WHITE: Color = Color(Vector3::new(1., 1., 1.));
 const BLACK: Color = Color(Vector3::new(0., 0., 0.));
 const BLUE: Color = Color(Vector3::new(0.5, 0.7, 1.));
+const MAX_RAY_DEPTH: i32 = 50;
 
 fn main() {
     // image
     const IMAGE_WIDTH: u32 = 400;
     const IMAGE_HEIGHT: u32 = (IMAGE_WIDTH as f64 / ASPECT_RATIO) as u32;
     const SAMPLES_PER_PIXEL: i32 = 100;
-    const MAX_RAY_DEPTH: i32 = 50;
 
     // camera
     let camera = Camera::default();
@@ -44,7 +44,7 @@ fn main() {
 
                 let ray = camera.get_ray(u, v);
 
-                color = color + ray_color(&ray, &world, MAX_RAY_DEPTH);
+                color = color + ray_color(&ray, &world, 0);
             }
             write_color(color, SAMPLES_PER_PIXEL);
         }
@@ -53,21 +53,18 @@ fn main() {
 }
 
 fn ray_color(ray: &Ray, world: &ObjectList<Sphere>, depth: i32) -> Color {
-    if depth <= 0 {
-        return BLACK;
-    };
-
     if let Some(intersection) = world.hit(ray, 0.001, INFINITY) {
-        let material = intersection.material;
-        if let Some((attenuation, refracted_ray)) = material.scatter(&ray, &intersection) {
-            return Color(
-                attenuation
-                    .0
-                    .zip_map(&ray_color(&refracted_ray, world, depth - 1).0, |l, r| l * r),
-            );
+        if depth < MAX_RAY_DEPTH {
+            if let Some((attenuation, refracted_ray)) =
+                intersection.material.scatter(&ray, &intersection)
+            {
+                let refracted_color = ray_color(&refracted_ray, world, depth + 1);
+                let attenuated_color = attenuation.0.zip_map(&refracted_color.0, |l, r| l * r);
+                return Color(attenuated_color);
+            }
+        } else {
+            return BLACK;
         }
-
-        return BLACK;
     }
 
     let unit_dir: Vector3<f64> = ray.dir.normalize();
@@ -81,9 +78,9 @@ fn write_color(color: Color, samples_per_pix: i32) {
     let mut b = color.0.z;
 
     let scale = 1. / samples_per_pix as f64;
-    r = 256. * clamp((r * scale).sqrt(), 0., 0.999);
-    g = 256. * clamp((g * scale).sqrt(), 0., 0.999);
-    b = 256. * clamp((b * scale).sqrt(), 0., 0.999);
+    r = 255.99 * clamp((r * scale).sqrt(), 0., 0.999);
+    g = 255.99 * clamp((g * scale).sqrt(), 0., 0.999);
+    b = 255.99 * clamp((b * scale).sqrt(), 0., 0.999);
 
     println!("{r} {g} {b} \n");
 }

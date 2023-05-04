@@ -34,7 +34,7 @@ pub fn random_range_vec(min: f64, max: f64) -> Vector3<f64> {
     )
 }
 
-fn random_unit_sphere() -> Vector3<f64> {
+pub fn random_unit_sphere() -> Vector3<f64> {
     loop {
         let p: Vector3<f64> = random_range_vec(-1., 1.);
         if p.magnitude_squared() >= 1. {
