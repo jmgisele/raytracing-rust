@@ -2,8 +2,9 @@ use nalgebra::Vector3;
 
 use crate::{
     data::Color,
-    math::{near_zero, random_unit_sphere, random_unit_vec, reflect},
+    math::{near_zero, rand, random_unit_sphere, random_unit_vec, reflect, refract},
     world::{Intersection, Ray},
+    WHITE,
 };
 
 #[derive(Copy, Clone)]
@@ -11,6 +12,7 @@ pub enum MaterialType {
     Lambertian(Lambertian),
     Metal(Metal),
     FuzzyMetal(FuzzyMetal),
+    Dielectric(Dielectric),
 }
 
 impl MaterialType {
@@ -19,6 +21,7 @@ impl MaterialType {
             MaterialType::Lambertian(lam) => lam.scatter(ray_in, intersection),
             MaterialType::Metal(metal) => metal.scatter(ray_in, intersection),
             MaterialType::FuzzyMetal(metal) => metal.scatter(ray_in, intersection),
+            MaterialType::Dielectric(metal) => metal.scatter(ray_in, intersection),
         }
     }
 }
@@ -57,7 +60,7 @@ pub struct Metal {
 
 impl Material for Metal {
     fn scatter(&self, ray_in: &Ray, intersection: &Intersection) -> Option<(Color, Ray)> {
-        let reflect_dir: Vector3<f64> = reflect(&ray_in.dir.normalize(), &intersection.normal);
+        let reflect_dir: Vector3<f64> = reflect(&ray_in.dir, &intersection.normal);
 
         let attenuation = self.albedo;
         let ray_scattered = Ray {
@@ -82,7 +85,7 @@ pub struct FuzzyMetal {
 
 impl Material for FuzzyMetal {
     fn scatter(&self, ray_in: &Ray, intersection: &Intersection) -> Option<(Color, Ray)> {
-        let reflect_dir: Vector3<f64> = reflect(&ray_in.dir.normalize(), &intersection.normal);
+        let reflect_dir: Vector3<f64> = reflect(&ray_in.dir, &intersection.normal);
 
         let attenuation = self.albedo;
         let ray_scattered = Ray {
@@ -96,5 +99,45 @@ impl Material for FuzzyMetal {
             true => Some((attenuation, ray_scattered)),
             false => None,
         }
+    }
+}
+
+#[derive(Copy, Clone)]
+pub struct Dielectric {
+    pub ref_index: f64,
+}
+
+impl Material for Dielectric {
+    fn scatter(&self, ray_in: &Ray, intersection: &Intersection) -> Option<(Color, Ray)> {
+        let attenuation = WHITE;
+        let refraction_ratio = match intersection.front_face {
+            true => 1.0 / self.ref_index,
+            false => self.ref_index,
+        };
+
+        let cos_theta = f64::min((-ray_in.dir.normalize()).dot(&intersection.normal), 1.0);
+        let sin_theta = (1. - cos_theta * cos_theta).sqrt();
+
+        let reflects: bool = refraction_ratio * sin_theta > 1.
+            || Dielectric::reflectance(cos_theta, refraction_ratio) > rand();
+        let direction = match reflects {
+            true => reflect(&ray_in.dir, &intersection.normal),
+            false => refract(&ray_in.dir, &intersection.normal, refraction_ratio),
+        };
+
+        let scattered_ray = Ray {
+            origin: intersection.point,
+            dir: direction,
+        };
+
+        Some((attenuation, scattered_ray))
+    }
+}
+
+impl Dielectric {
+    fn reflectance(cos: f64, reflection_index: f64) -> f64 {
+        let mut r0 = (1. - reflection_index) / (1. + reflection_index);
+        r0 = r0 * r0;
+        r0 + (1. - r0) * (1. - cos).powf(5.)
     }
 }

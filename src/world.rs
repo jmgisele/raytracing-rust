@@ -33,6 +33,7 @@ pub trait Hittable {
     }
 }
 
+// aka 'hit record'
 #[derive(Copy, Clone)]
 pub struct Intersection {
     pub point: Point,
@@ -139,6 +140,7 @@ impl Default for ObjectList<Sphere> {
             objects: Vec::new(),
         };
 
+        // ground
         world.objects.push(Sphere {
             center: Point(Vector3::new(0., -100.5, -1.)),
             radius: 100.,
@@ -147,23 +149,25 @@ impl Default for ObjectList<Sphere> {
             }),
         });
 
-        //center
+        // center
         world.objects.push(Sphere {
             center: Point(Vector3::new(0., 0., -1.)),
             radius: 0.5,
             material: MaterialType::Lambertian(Lambertian {
-                albedo: Color(Vector3::new(0.7, 0.3, 0.3)),
+                albedo: Color(Vector3::new(0.1, 0.2, 0.5)),
             }),
+            // material: MaterialType::Dielectric(crate::material::Dielectric { ref_index: 1.5 }),
         });
 
         // left
         world.objects.push(Sphere {
             center: Point(Vector3::new(-1., 0., -1.)),
             radius: 0.5,
-            material: MaterialType::FuzzyMetal(FuzzyMetal {
-                albedo: Color(Vector3::new(0.8, 0.8, 0.8)),
-                fuzz: 0.3,
-            }),
+            // material: MaterialType::FuzzyMetal(FuzzyMetal {
+            //     albedo: Color(Vector3::new(0.8, 0.8, 0.8)),
+            //     fuzz: 0.3,
+            // }),
+            material: MaterialType::Dielectric(crate::material::Dielectric { ref_index: 1.5 }),
         });
 
         // right
@@ -173,6 +177,10 @@ impl Default for ObjectList<Sphere> {
             material: MaterialType::Metal(Metal {
                 albedo: Color(Vector3::new(0.8, 0.6, 0.2)),
             }),
+            // material: MaterialType::FuzzyMetal(FuzzyMetal {
+            //     albedo: Color(Vector3::new(0.8, 0.6, 0.2)),
+            //     fuzz: 1.0,
+            // }),
         });
 
         world
